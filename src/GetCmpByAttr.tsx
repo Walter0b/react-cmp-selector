@@ -14,7 +14,7 @@ interface GetCmpByAttrProps {
     debug?: boolean
 }
 
-const GetCmpByAttr = ({
+const getCmpByAttr = ({
     children,
     attr = 'data-slot',
     value = '',
@@ -49,4 +49,4 @@ const GetCmpByAttr = ({
     }, [children, attr, value, props, debug])
 }
 
-export default GetCmpByAttr
+export default getCmpByAttr
