@@ -1,18 +1,19 @@
 {
   "name": "react-cmp-selector",
-  "version": "1.0.2",
+  "version": "1.0.0",
   "description": "A lightweight utility for filtering and selecting React components based on specified attributes and values",
-  "main": "dist/src/index.js",
-  "types": "dist/src/index.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc"
   },
   "author": "Walter0b",
-  "license": "ISC",
+  "license": "MIT",
   "devDependencies": {
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
-    "react": "^18.3.1"
+    "react": "^18.3.1",
+    "typescript": "^5.5.4"
   },
   "peerDependencies": {
     "react": "^17.0.0 || ^18.0.0",
@@ -27,8 +28,5 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/Walter0b/react-cmp-selector.git"
-  },
-  "dependencies": {
-    "typescript": "^5.5.4"
   }
 }
