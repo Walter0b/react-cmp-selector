@@ -1,6 +1,6 @@
 {
   "name": "react-cmp-selector",
-  "version": "1.0.0",
+  "version": "1.0.5",
   "description": "A lightweight utility for filtering and selecting React components based on specified attributes and values",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
