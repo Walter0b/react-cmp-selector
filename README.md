@@ -1,16 +1,36 @@
 # react-cmp-selector
 
-`react-cmp-selector` is a lightweight utility for filtering and selecting React components based on specific attributes and values. It allows developers to dynamically query and manipulate components within a React component tree, enabling more flexible and dynamic rendering logic.
+A powerful and extensible utility for selecting and manipulating React components based on attributes. Ideal for dynamic layouts, slotted rendering, and component injection patterns.
 
-## Features
+---
 
-- **Attribute-Based Component Selection:** Easily select and manipulate components by specifying a specific attribute and value.
-- **Supports Additional Props:** Clone and extend components with additional props when rendering.
-- **Debugging:** Optional debugging to log matched components during development.
+## Table of Contents
+
+- [react-cmp-selector](#react-cmp-selector)
+  - [Table of Contents](#table-of-contents)
+  - [Installation](#installation)
+  - [Motivation](#motivation)
+  - [Table of Proposals](#table-of-proposals)
+  - [Usage](#usage)
+    - [1. Basic Slot Matching](#1-basic-slot-matching)
+    - [2. Matching Multiple Components](#2-matching-multiple-components)
+    - [3. Combining Event Handlers](#3-combining-event-handlers)
+    - [4. Declarative API with `<Slot>`](#4-declarative-api-with-slot)
+    - [5. Fallback Slot Content](#5-fallback-slot-content)
+    - [6. Slot Markers](#6-slot-markers)
+    - [7. Slot Validation](#7-slot-validation)
+  - [Use Cases](#use-cases)
+  - [API Reference](#api-reference)
+    - [`getCmpByAttr<P>()`](#getcmpbyattrp)
+    - [`ComponentFinderProps`](#componentfinderprops)
+    - [`Slot`](#slot)
+    - [`SlotUtils`](#slotutils)
+  - [Caveats](#caveats)
+  - [License](#license)
+
+---
 
 ## Installation
-
-To install the package, run:
 
 ```bash
 npm install react-cmp-selector
@@ -22,187 +42,312 @@ or using yarn:
 yarn add react-cmp-selector
 ```
 
+---
+
+## Motivation
+
+React does not support named slots or dynamic selection of children out of the box. This utility solves that by providing:
+
+- A **hook** to search through children by attribute
+- A **component-based API** (`<Slot>`) for declarative slot usage
+- Tools to **inject props**, **merge handlers**, and **validate layout contracts**
+
+---
+
+## Table of Proposals
+
+| Feature                       | Prop / Option              | Type                              | Description                                                   |
+| ----------------------------- | -------------------------- | --------------------------------- | ------------------------------------------------------------- |
+| **Attribute Matching**        | `attribute`                | `string`                          | Attribute name to search for (default: `'data-slot'`)         |
+| **Value Matching**            | `value` / `name`           | `string`                          | The value to match against the selected attribute             |
+| **Prop Merging**              | `props`                    | `Partial<P>`                      | Injected props to merge into the matched component(s)         |
+| **Function Merging Strategy** | `functionPropMerge`        | `'combine' \| 'override'`         | Defines how function props like `onClick` should be merged    |
+| **Debug Mode**                | `debug`                    | `boolean`                         | Enables logging of matching and merging behavior              |
+| **Match All**                 | `findAll`                  | `boolean`                         | If true, returns all matching components instead of the first |
+| **Hook Interface**            | `getCmpByAttr()`           | —                                 | Programmatic interface to extract and modify children         |
+| **Declarative API**           | `<Slot>`                   | —                                 | React component alternative to the hook                       |
+| **Slot Markers**              | `SlotUtils.createMarker()` | —                                 | Creates a named slot wrapper component                        |
+| **Slot Validation**           | `SlotUtils.validate()`     | —                                 | Dev-only validation for required slot presence                |
+| **Fallback Rendering**        | `fallback`                 | `ReactNode`                       | Rendered if no matching slot is found                         |
+| **onFound Callback**          | `onFound`                  | `(element: ReactElement) => void` | Runs when a match is found (e.g. for side effects)            |
+
+---
+
 ## Usage
 
-### Basic Usage
+### 1. Basic Slot Matching
 
-Suppose you have a set of child components within a parent component, and you want to select a specific child component based on a `data-slot` attribute. You can use `react-cmp-selector` to do this.
+**Children**
 
-#### Example
-
-```typescript
-import React from "react";
-import getCmpByAttr from "react-cmp-selector";
-
-function ParentComponent({ children }: { children: React.ReactNode }) {
-  const headerComponent = getCmpByAttr({
-    children,
-    value: "header", // Select component with data-slot="header"
-  });
-
-  const bodyComponent = getCmpByAttr({
-    children,
-    value: "body", // Select component with data-slot="body"
-  });
-
-  const footerComponent = getCmpByAttr({
-    children,
-    value: "footer", // Select component with data-slot="body"
-  });
-
+```tsx
+export function ChildComponents() {
   return (
-    <div className="bg-red p-auto">
-      {headerComponent}
-      <div ClassName="bg-blue mt-10">{bodyComponent}</div>
-      {footerComponent}
-    </div>
-  );
-}
-
-export default function App() {
-  return (
-    <ParentComponent>
-      <div data-slot="header">This is the header</div>
-      <div data-slot="body">This is the body</div>
-      <div data-slot="footer">This is the footer</div>
-    </ParentComponent>
+    <>
+      <div data-slot="header">Header</div>
+      <div data-slot="body">Body</div>
+      <div data-slot="footer">Footer</div>
+    </>
   );
 }
 ```
 
-#### Limitation with Next.js Routes
+**Parent**
 
-While `react-cmp-selector` works well within the same component tree (such as nested components), there is a known limitation when using it with Next.js routing.
+```tsx
+const header = getCmpByAttr({
+  children: <ChildComponents />,
+  value: "header",
+  props: { className: "highlighted" },
+});
+```
 
-In Next.js, layouts and pages are handled separately. When components are passed from a parent layout to a child page, the `data-slot` attribute may not be detected as expected. This is because of the way Next.js manages the component hierarchy between layouts and pages. As a result, `getCmpByAttr` will not work as intended between layouts and pages.
+**Output**
 
-##### Example (Next.js Limitation)
+```html
+<div data-slot="header" class="highlighted">Header</div>
+```
 
-If you attempt to use `react-cmp-selector` across a Next.js layout and a page like this:
+**How It Works**
 
-```typescript
-// Layout.js
-export default function Layout({ children }) {
-  return <div>{children}</div>;
-}
+- `getCmpByAttr()` searches children for `data-slot="header"`.
+- The match is cloned with the `className` prop added.
 
-// Page.js
-import getCmpByAttr from "react-cmp-selector";
+---
 
-export default function Page({ children }) {
-  const headerComponent = getCmpByAttr({
-    children,
-    value: "header",
-  });
+### 2. Matching Multiple Components
 
-  return <div>{headerComponent}</div>;
+**Children**
+
+```tsx
+function Buttons() {
+  return (
+    <>
+      <button data-role="action-button">Save</button>
+      <button data-role="action-button">Cancel</button>
+    </>
+  );
 }
 ```
 
-It will not detect components passed from the layout due to the separation of layouts and pages in Next.js.
+**Parent**
 
-#### Workaround for Next.js
+```tsx
+const buttons = getCmpByAttr({
+  children: <Buttons />,
+  attribute: "data-role",
+  value: "action-button",
+  findAll: true,
+  props: { "data-tracked": true },
+});
+```
 
-For Next.js, `react-cmp-selector` will work properly when used within the same component (i.e., nested components on the same page), but it cannot detect components passed between a layout and a page. To handle this, you can pass components explicitly through props or use context to share component references between the layout and pages.
+**Output**
 
-##### Example (Next.js Workaround)
-
-```typescript
-// Layout.js
-import { createContext, useContext } from "react";
-
-const SlotContext = createContext();
-
-export function Layout({ children }) {
-  return (
-    <SlotContext.Provider value={{ header: "Header Content" }}>
-      <div>{children}</div>
-    </SlotContext.Provider>
-  );
-}
-
-export function useSlots() {
-  return useContext(SlotContext);
-}
-
-// Page.js
-import { useSlots } from "./Layout";
-
-export default function Page() {
-  const slots = useSlots();
-
-  return (
-    <div>
-      <header>{slots.header}</header>
-      <div>Page Content</div>
-    </div>
-  );
-}
+```html
+<button data-role="action-button" data-tracked="true">Save</button>
+<button data-role="action-button" data-tracked="true">Cancel</button>
 ```
 
 ---
 
-### Summary
+### 3. Combining Event Handlers
 
-- **Works well in React (React Router)**: You can use `react-cmp-selector` for selecting components within the same component tree, such as nested components or when rendering children directly.
-- **Limitations in Next.js**: It does not work as expected when selecting components between Next.js layouts and pages due to the separation of components between layout and page rendering.
-- **Workaround for Next.js**: Use context or pass components explicitly through props to handle layouts and pages in Next.js.
+**Children**
 
-### Use Cases
+```tsx
+function CTA() {
+  return (
+    <button data-slot="cta" onClick={() => console.log("child")}>
+      Click Me
+    </button>
+  );
+}
+```
 
-1. **Dynamic Rendering:**
+**Parent**
 
-   - Selectively render components based on specific criteria, such as user roles, permissions, or other dynamic conditions.
-
-2. **Custom Layouts:**
-
-   - Create custom layouts where different components are placed in specific slots. Use `react-cmp-selector` to retrieve and place these components in the correct positions.
-
-3. **Component Wrapping:**
-   - Wrap selected components with additional functionality or styling by cloning them with extra props.
-
-### Advanced Usage
-
-#### Passing Additional Props
-
-You can pass additional props to the selected component using the `props` option:
-
-```typescript
-const enhancedHeader = getCmpByAttr({
-  children,
-  value: "header",
-  props: { className: "enhanced-header" }, // Add additional props
+```tsx
+const cta = getCmpByAttr({
+  children: <CTA />,
+  value: "cta",
+  props: {
+    onClick: () => console.log("parent"),
+  },
+  functionPropMerge: "combine",
 });
 ```
 
-#### Debugging
+**Behavior**
 
-Enable debugging to log the selected component to the console:
+Console logs:
 
-```typescript
-const headerWithDebug = getCmpByAttr({
-  children,
-  value: "header",
-  debug: true, // Enable debugging
-});
+```
+child
+parent
 ```
 
-**Parameters:**
+---
 
-- `children`: `ReactNode` - The children components to search through.
-- `attr`: `string` (optional) - The attribute to search by. Defaults to `data-slot`.
-- `value`: `string` - The value of the attribute to match.
-- `props`: `Record<string, any>` (optional) - Additional props to pass to the matched component.
-- `debug`: `boolean` (optional) - If true, logs the matched component(s) to the console.
+### 4. Declarative API with `<Slot>`
 
-**Returns:**
+```tsx
+export function Layout({ children }: { children: React.ReactNode }) {
+  return (
+    <div>
+      <Slot name="header">{children}</Slot>
+      <main>
+        <Slot name="content">{children}</Slot>
+      </main>
+    </div>
+  );
+}
+```
 
-- `ReactNode | null` - The matched component or `null` if no match is found.
+```tsx
+function PageContent() {
+  return (
+    <>
+      <div data-slot="header">Welcome</div>
+      <div data-slot="content">Hello, world!</div>
+    </>
+  );
+}
 
-## Contributing
+<Layout>
+  <PageContent />
+</Layout>;
+```
 
-Contributions are welcome! Please open an issue or submit a pull request if you have suggestions or improvements.
+**Output**
+
+```html
+<div>
+  <div data-slot="header">Welcome</div>
+  <main>
+    <div data-slot="content">Hello, world!</div>
+  </main>
+</div>
+```
+
+---
+
+### 5. Fallback Slot Content
+
+```tsx
+<Slot name="hero" fallback={<div>Default Hero</div>}>
+  {children}
+</Slot>
+```
+
+If no `data-slot="hero"` is found, it renders:
+
+```html
+<div>Default Hero</div>
+```
+
+---
+
+### 6. Slot Markers
+
+**Marker Declaration**
+
+```tsx
+const HeroSlot = SlotUtils.createMarker("hero");
+
+function Page() {
+  return (
+    <HeroSlot>
+      <div className="hero-banner">Custom Hero</div>
+    </HeroSlot>
+  );
+}
+```
+
+**Parent**
+
+```tsx
+<Slot name="hero" fallback={<div>Default Hero</div>}>
+  <Page />
+</Slot>
+```
+
+---
+
+### 7. Slot Validation
+
+```tsx
+SlotUtils.validate(children, ["header", "footer"]);
+```
+
+- Dev-only.
+- Warns if `data-slot="header"` or `footer` is missing in children.
+
+---
+
+## Use Cases
+
+- **Composable Layouts**: Dynamically slot content into shared layouts.
+- **Design Systems**: Enable flexible API layers with predictable slot names.
+- **Multi-brand / White-label UIs**: Inject branding-specific content without hardcoding.
+- **Next.js Layouts**: Use context + slots to bridge `app/layout.tsx` and pages.
+- **Dynamic Prop Injection**: Apply analytics, A/B testing, or class injection to specific slots.
+
+---
+
+## API Reference
+
+### `getCmpByAttr<P>()`
+
+```ts
+function getCmpByAttr<P>(
+  options: ComponentFinderProps<P>
+): ReactNode | ReactNode[] | null;
+```
+
+### `ComponentFinderProps`
+
+```ts
+interface ComponentFinderProps<P = unknown> {
+  children: ReactNode;
+  attribute?: string;
+  value?: string;
+  props?: Partial<P>;
+  debug?: boolean;
+  findAll?: boolean;
+  onFound?: (component: ReactElement) => void;
+  functionPropMerge?: "combine" | "override";
+}
+```
+
+### `Slot`
+
+```tsx
+<Slot
+  name="footer"
+  props={{ className: "sticky" }}
+  fallback={<DefaultFooter />}
+>
+  {children}
+</Slot>
+```
+
+### `SlotUtils`
+
+```ts
+SlotUtils.createMarker(name: string, attribute?: string): Component
+SlotUtils.validate(children: ReactNode, requiredSlots: string[], attribute?: string): void
+```
+
+---
+
+## Caveats
+
+- **Next.js layouts** require a shared context if crossing page boundaries.
+- `getCmpByAttr` only works on elements rendered within the same render cycle.
+- This is **not a DOM query tool** – it’s entirely based on **React element trees**.
+
+---
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](https://opensource.org/licenses/MIT) file for details.
+MIT License

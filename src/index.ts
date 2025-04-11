@@ -1,1 +1,1 @@
-export { default } from './GetCmpByAttr';
+export * from './GetCmpByAttr';
