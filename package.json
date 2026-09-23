@@ -1,47 +1,76 @@
 {
   "name": "react-cmp-selector",
-  "version": "2.0.0",
-  "description": "A powerful and extensible utility for filtering and selecting React components based on specified attributes and values.",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "version": "3.0.0",
+  "description": "Named slots and attribute-based selection for React element trees.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
   "scripts": {
-    "build": "tsc"
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run format:check && npm run typecheck && npm test && npm run build && npm run test:package",
+    "test:package": "node scripts/check-package.mjs",
+    "prepack": "npm run build"
   },
   "author": "Walter0b",
   "license": "MIT",
   "keywords": [
-    "React",
-    "Slot",
-    "GetCmpByAttr",
-    "Component Selector",
-    "Component Filtering",
-    "React Slot",
-    "Slot API"
+    "react",
+    "slots",
+    "components",
+    "composition",
+    "typescript"
   ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Walter0b/react-cmp-selector.git"
   },
-  "devDependencies": {
-    "@types/react": "^18.3.5",
-    "@types/react-dom": "^18.3.0",
-    "react": "^18.3.1",
-    "typescript": "^5.5.4"
+  "bugs": {
+    "url": "https://github.com/Walter0b/react-cmp-selector/issues"
   },
+  "homepage": "https://github.com/Walter0b/react-cmp-selector#readme",
   "peerDependencies": {
-    "react": "^17.0.0 || ^18.0.0",
-    "react-dom": "^17.0.0 || ^18.0.0"
+    "react": "^17.0.0 || ^18.0.0 || ^19.0.0"
   },
-  "files": [
-    "dist",
-    "README.md",
-    "LICENSE"
-  ],
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "prettier": "^3.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.9.0",
+    "vitest": "^5.0.1"
+  },
+  "overrides": {
+    "tsup": {
+      "esbuild": "^0.28.1"
     }
   }
 }

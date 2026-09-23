@@ -1,353 +1,244 @@
 # react-cmp-selector
 
-A powerful and extensible utility for selecting and manipulating React components based on attributes. Ideal for dynamic layouts, slotted rendering, and component injection patterns.
+Named slots and attribute-based selection for React element trees.
 
----
+Build layouts whose children declare where they belong. Select one or every matching element, inject props, or render a fallback. Written in TypeScript, with no runtime dependencies beyond React.
 
-## Table of Contents
-
-- [react-cmp-selector](#react-cmp-selector)
-  - [Table of Contents](#table-of-contents)
-  - [Installation](#installation)
-  - [Motivation](#motivation)
-  - [Table of Proposals](#table-of-proposals)
-  - [Usage](#usage)
-    - [1. Basic Slot Matching](#1-basic-slot-matching)
-    - [2. Matching Multiple Components](#2-matching-multiple-components)
-    - [3. Combining Event Handlers](#3-combining-event-handlers)
-    - [4. Declarative API with `<Slot>`](#4-declarative-api-with-slot)
-    - [5. Fallback Slot Content](#5-fallback-slot-content)
-    - [6. Slot Markers](#6-slot-markers)
-    - [7. Slot Validation](#7-slot-validation)
-  - [Use Cases](#use-cases)
-  - [API Reference](#api-reference)
-    - [`getCmpByAttr<P>()`](#getcmpbyattrp)
-    - [`ComponentFinderProps`](#componentfinderprops)
-    - [`Slot`](#slot)
-    - [`SlotUtils`](#slotutils)
-  - [Caveats](#caveats)
-  - [License](#license)
-
----
+Supports React 17, 18 and 19. Ships ESM, CommonJS and TypeScript declarations.
 
 ## Installation
 
-```bash
+```sh
 npm install react-cmp-selector
 ```
 
-or using yarn:
+React is a peer dependency. Use your application's existing React installation.
 
-```bash
-yarn add react-cmp-selector
-```
-
----
-
-## Motivation
-
-React does not support named slots or dynamic selection of children out of the box. This utility solves that by providing:
-
-- A **hook** to search through children by attribute
-- A **component-based API** (`<Slot>`) for declarative slot usage
-- Tools to **inject props**, **merge handlers**, and **validate layout contracts**
-
----
-
-## Table of Proposals
-
-| Feature                       | Prop / Option              | Type                              | Description                                                   |
-| ----------------------------- | -------------------------- | --------------------------------- | ------------------------------------------------------------- |
-| **Attribute Matching**        | `attribute`                | `string`                          | Attribute name to search for (default: `'data-slot'`)         |
-| **Value Matching**            | `value` / `name`           | `string`                          | The value to match against the selected attribute             |
-| **Prop Merging**              | `props`                    | `Partial<P>`                      | Injected props to merge into the matched component(s)         |
-| **Function Merging Strategy** | `functionPropMerge`        | `'combine' \| 'override'`         | Defines how function props like `onClick` should be merged    |
-| **Debug Mode**                | `debug`                    | `boolean`                         | Enables logging of matching and merging behavior              |
-| **Match All**                 | `findAll`                  | `boolean`                         | If true, returns all matching components instead of the first |
-| **Hook Interface**            | `getCmpByAttr()`           | —                                 | Programmatic interface to extract and modify children         |
-| **Declarative API**           | `<Slot>`                   | —                                 | React component alternative to the hook                       |
-| **Slot Markers**              | `SlotUtils.createMarker()` | —                                 | Creates a named slot wrapper component                        |
-| **Slot Validation**           | `SlotUtils.validate()`     | —                                 | Dev-only validation for required slot presence                |
-| **Fallback Rendering**        | `fallback`                 | `ReactNode`                       | Rendered if no matching slot is found                         |
-| **onFound Callback**          | `onFound`                  | `(element: ReactElement) => void` | Runs when a match is found (e.g. for side effects)            |
-
----
-
-## Usage
-
-### 1. Basic Slot Matching
-
-**Children**
+## Quick start
 
 ```tsx
-export function ChildComponents() {
+import type { ReactNode } from 'react';
+import { Slot } from 'react-cmp-selector';
+
+function Layout({ children }: { children: ReactNode }) {
   return (
-    <>
-      <div data-slot="header">Header</div>
-      <div data-slot="body">Body</div>
-      <div data-slot="footer">Footer</div>
-    </>
-  );
-}
-```
-
-**Parent**
-
-```tsx
-const header = getCmpByAttr({
-  children: <ChildComponents />,
-  value: "header",
-  props: { className: "highlighted" },
-});
-```
-
-**Output**
-
-```html
-<div data-slot="header" class="highlighted">Header</div>
-```
-
-**How It Works**
-
-- `getCmpByAttr()` searches children for `data-slot="header"`.
-- The match is cloned with the `className` prop added.
-
----
-
-### 2. Matching Multiple Components
-
-**Children**
-
-```tsx
-function Buttons() {
-  return (
-    <>
-      <button data-role="action-button">Save</button>
-      <button data-role="action-button">Cancel</button>
-    </>
-  );
-}
-```
-
-**Parent**
-
-```tsx
-const buttons = getCmpByAttr({
-  children: <Buttons />,
-  attribute: "data-role",
-  value: "action-button",
-  findAll: true,
-  props: { "data-tracked": true },
-});
-```
-
-**Output**
-
-```html
-<button data-role="action-button" data-tracked="true">Save</button>
-<button data-role="action-button" data-tracked="true">Cancel</button>
-```
-
----
-
-### 3. Combining Event Handlers
-
-**Children**
-
-```tsx
-function CTA() {
-  return (
-    <button data-slot="cta" onClick={() => console.log("child")}>
-      Click Me
-    </button>
-  );
-}
-```
-
-**Parent**
-
-```tsx
-const cta = getCmpByAttr({
-  children: <CTA />,
-  value: "cta",
-  props: {
-    onClick: () => console.log("parent"),
-  },
-  functionPropMerge: "combine",
-});
-```
-
-**Behavior**
-
-Console logs:
-
-```
-child
-parent
-```
-
----
-
-### 4. Declarative API with `<Slot>`
-
-```tsx
-export function Layout({ children }: { children: React.ReactNode }) {
-  return (
-    <div>
-      <Slot name="header">{children}</Slot>
+    <article>
+      <header>
+        <Slot name="header" fallback={<h1>Untitled</h1>}>
+          {children}
+        </Slot>
+      </header>
       <main>
-        <Slot name="content">{children}</Slot>
+        <Slot name="body">{children}</Slot>
       </main>
-    </div>
+    </article>
+  );
+}
+
+export default function Page() {
+  return (
+    <Layout>
+      <h1 data-slot="header">My project</h1>
+      <p data-slot="body">Welcome!</p>
+    </Layout>
   );
 }
 ```
 
-```tsx
-function PageContent() {
-  return (
-    <>
-      <div data-slot="header">Welcome</div>
-      <div data-slot="content">Hello, world!</div>
-    </>
-  );
-}
+`Slot` adds no DOM wrapper. Unmatched content is omitted unless you render it separately.
 
-<Layout>
+## What can be searched?
+
+The selector inspects **the elements you pass in**, including arrays, fragments, and nested `props.children`. It never calls your components to discover their output.
+
+```tsx
+// Works: the header element is part of the supplied tree.
+<Slot name="header">
+  <>
+    <h1 data-slot="header">Hello</h1>
+  </>
+</Slot>;
+
+// Does not find a header returned inside PageContent.
+<Slot name="header">
   <PageContent />
-</Layout>;
+</Slot>;
+
+// Works: select PageContent itself by a prop on its element.
+<Slot name="header">
+  <PageContent data-slot="header" />
+</Slot>;
 ```
 
-**Output**
+Custom components do not need to forward the attribute to the DOM for selection to work. They do need to accept any injected props you want them to use.
 
-```html
-<div>
-  <div data-slot="header">Welcome</div>
-  <main>
-    <div data-slot="content">Hello, world!</div>
-  </main>
-</div>
-```
+This boundary is part of [React's children model](https://react.dev/reference/react/Children#troubleshooting). Context, memoization and Next.js layouts do not make a component's rendered output inspectable. Portals and unresolved async children are not searchable. Pass a synchronous element tree; await data before constructing it.
 
----
+Selecting a nested element moves that element into the slot without its ancestors. Ancestor styles, context providers and DOM structure do not follow it. If an ancestor and its descendant both match `findAll`, both are returned, which can render the descendant twice.
 
-### 5. Fallback Slot Content
+For a small fixed layout, explicit props such as `header={<Header />}` may be simpler. This library is useful when callers supply a collection of children and the layout selects them by role.
+
+## Select elements programmatically
+
+`getCmpByAttr` is a regular function, **not a hook**. You can use it in a component, during server rendering, or outside React.
 
 ```tsx
-<Slot name="hero" fallback={<div>Default Hero</div>}>
-  {children}
-</Slot>
+import { getCmpByAttr } from 'react-cmp-selector';
+
+const children = (
+  <>
+    <button data-role="action">Save</button>
+    <button data-role="action">Cancel</button>
+  </>
+);
+
+const buttons = getCmpByAttr({
+  children,
+  attribute: 'data-role',
+  value: 'action',
+  findAll: true,
+  props: { className: 'tracked' },
+});
+// ReactElement[]; [] if nothing matches.
 ```
 
-If no `data-slot="hero"` is found, it renders:
+The default selects the first match in depth-first order and returns `null` when none exists. With `findAll: true`, the result is always an array. TypeScript overloads reflect these return types.
 
-```html
-<div>Default Hero</div>
-```
+A single match with no injected props retains its original element identity. Multiple matches receive keys scoped to their original tree paths so local keys from separate branches do not collide. Supply stable React keys to preserve identity when siblings reorder; moving an element between branches changes its generated key.
 
----
-
-### 6. Slot Markers
-
-**Marker Declaration**
+## Prop merging
 
 ```tsx
-const HeroSlot = SlotUtils.createMarker("hero");
+const action = getCmpByAttr({
+  children: (
+    <button data-slot="action" onClick={() => console.log('child')}>
+      Save
+    </button>
+  ),
+  value: 'action',
+  props: { onClick: () => console.log('parent') },
+});
+```
 
-function Page() {
+- Ordinary injected props replace existing values.
+- `className` strings are joined with a space. Class conflicts are not resolved.
+- `style` objects are shallowly merged, with injected properties winning.
+- Functions run child-first, then injected, with the same arguments and `this`. The combined function returns the injected function's result. Set `functionPropMerge: 'override'` to replace functions instead.
+- `ref` follows React's replacement rules: a non-undefined injected ref replaces the original, `null` clears it, and `undefined` preserves it. Ref callbacks are never combined. Existing refs and single-match keys are otherwise preserved. `findAll` owns result keys and ignores an injected `key`.
+- Explicit `undefined` can clear a class or style value. Omitted props stay unchanged.
+
+Function combination is synchronous: it does not await promises or skip the second callback after `event.preventDefault()`. If the first callback throws, the second does not run. Use `override` and your own handler when you need different behavior.
+
+For typed injected props, pass a generic:
+
+```tsx
+import type { ButtonHTMLAttributes } from 'react';
+
+getCmpByAttr<ButtonHTMLAttributes<HTMLButtonElement>>({
+  children,
+  attribute: 'data-role',
+  value: 'action',
+  props: { disabled: true },
+});
+```
+
+The generic checks injected props; it cannot prove that every element selected from an arbitrary tree accepts them.
+
+## Reusable slot markers
+
+Markers let you name a slot once. Declare them **outside render functions** so their component identity stays stable.
+
+```tsx
+import { Slot, SlotUtils } from 'react-cmp-selector';
+
+const HeroSlot = SlotUtils.createMarker('hero');
+
+export default function Page() {
   return (
-    <HeroSlot>
-      <div className="hero-banner">Custom Hero</div>
-    </HeroSlot>
+    <Slot name="hero" fallback={<p>No hero yet</p>}>
+      <HeroSlot className="hero">
+        <h1>Hello</h1>
+      </HeroSlot>
+    </Slot>
   );
 }
 ```
 
-**Parent**
+Markers are discoverable from metadata on their component type before React renders them. They render a `<div data-slot="hero" style="display: contents">` and accept normal div attributes. You may override the display style. The marker name is fixed; supplying another `data-slot` does not rename it.
+
+`createMarker(name, attribute)` also supports custom attributes. Use the same attribute when selecting or validating. Pass marker elements directly or within explicit children; hiding them inside another component's implementation still prevents discovery. Wrapping a marker type in `memo` or a higher-order component hides its metadata; put the selection attribute on the wrapper element instead.
+
+## Fallbacks and multiple matches
 
 ```tsx
-<Slot name="hero" fallback={<div>Default Hero</div>}>
-  <Page />
-</Slot>
-```
-
----
-
-### 7. Slot Validation
-
-```tsx
-SlotUtils.validate(children, ["header", "footer"]);
-```
-
-- Dev-only.
-- Warns if `data-slot="header"` or `footer` is missing in children.
-
----
-
-## Use Cases
-
-- **Composable Layouts**: Dynamically slot content into shared layouts.
-- **Design Systems**: Enable flexible API layers with predictable slot names.
-- **Multi-brand / White-label UIs**: Inject branding-specific content without hardcoding.
-- **Next.js Layouts**: Use context + slots to bridge `app/layout.tsx` and pages.
-- **Dynamic Prop Injection**: Apply analytics, A/B testing, or class injection to specific slots.
-
----
-
-## API Reference
-
-### `getCmpByAttr<P>()`
-
-```ts
-function getCmpByAttr<P>(
-  options: ComponentFinderProps<P>
-): ReactNode | ReactNode[] | null;
-```
-
-### `ComponentFinderProps`
-
-```ts
-interface ComponentFinderProps<P = unknown> {
-  children: ReactNode;
-  attribute?: string;
-  value?: string;
-  props?: Partial<P>;
-  debug?: boolean;
-  findAll?: boolean;
-  onFound?: (component: ReactElement) => void;
-  functionPropMerge?: "combine" | "override";
-}
-```
-
-### `Slot`
-
-```tsx
-<Slot
-  name="footer"
-  props={{ className: "sticky" }}
-  fallback={<DefaultFooter />}
->
+<Slot name="action" findAll fallback={<p>No actions</p>}>
   {children}
 </Slot>
 ```
 
-### `SlotUtils`
+`Slot` accepts the selector options, with `name` instead of `value`, plus `fallback`. It renders the fallback only when there are no matches, including an empty `findAll` result. The default fallback is `null`.
 
-```ts
-SlotUtils.createMarker(name: string, attribute?: string): Component
-SlotUtils.validate(children: ReactNode, requiredSlots: string[], attribute?: string): void
+## Validate layout contracts
+
+```tsx
+const missing = SlotUtils.validate(children, ['header', 'body']);
+// string[] of missing names, in requested order, without duplicates.
 ```
 
----
+Validation uses the same traversal and marker support as selection. It returns missing names in every environment and also warns outside production. A third argument selects a custom attribute. Run validation where diagnostics are useful; calling it during render may log repeatedly.
 
-## Caveats
+## API reference
 
-- **Next.js layouts** require a shared context if crossing page boundaries.
-- `getCmpByAttr` only works on elements rendered within the same render cycle.
-- This is **not a DOM query tool** – it’s entirely based on **React element trees**.
+| Selector option     | Default       | Meaning                                 |
+| ------------------- | ------------- | --------------------------------------- |
+| `children`          | Required      | React elements to inspect               |
+| `attribute`         | `'data-slot'` | Prop name to match                      |
+| `value`             | `''`          | Exact string value to match             |
+| `props`             | None          | Props to inject into selected elements  |
+| `findAll`           | `false`       | Return all matches instead of the first |
+| `functionPropMerge` | `'combine'`   | Combine or override function props      |
+| `debug`             | `false`       | Log results outside production          |
 
----
+Exports: `getCmpByAttr`, `Slot`, `SlotUtils`, and the types `ComponentFinderProps`, `SlotProps`, `SlotMarkerProps`.
+
+The library uses no hooks, browser APIs, React internals or component execution. It can select supplied element trees during server rendering. Framework server/client boundaries still apply: it cannot inspect client component output from a server component, and event handlers remain subject to your framework's rules.
+
+## Migrating from v2
+
+Version 3 is a major release with these intentional changes:
+
+1. `getCmpByAttr` no longer calls hooks. Existing calls inside components continue to work; calls outside components now work too. If you need memoization for a large stable tree, wrap the call in your own `useMemo`.
+2. `onFound` was removed. It previously ran side effects during render. Use the returned elements directly, or put client-side notifications in your own `useEffect` with appropriate dependencies. Effects may run again under Strict Mode; this was never an exactly-once callback.
+3. `findAll: true` returns `[]` instead of `null` when nothing matches. Check `.length`; an empty array is truthy.
+4. Classes and styles now merge. To remove existing values, explicitly inject `undefined`. Function combination returns the injected result and never combines refs.
+5. Markers are now discoverable and validation recurses through the same supplied tree. Validation returns missing names, including in production; warnings remain disabled in production.
+6. React 19 is supported. `react-dom` is no longer a peer dependency. The package provides separate ESM and CommonJS files and targets ES2020; older browsers need application-level transpilation.
+7. README examples now pass visible elements. Examples that expected selection inside `<ChildComponents />` never worked; expose the selection attribute on that component or pass its slotted elements explicitly.
+
+## Development
+
+Use Node.js 22.12+ or 24 and npm.
+
+```sh
+npm ci
+npm run check
+```
+
+`check` runs formatting verification, TypeScript checks, behavioral tests, both builds, and package export/content checks (including ESM and CommonJS TypeScript consumers). `npm run test:watch` starts watch mode; `npm run format` formats the repository.
+
+CI runs the same checks against React and React DOM 17, 18 and 19, with matching React types, on Node.js 22 and 24. Tests cover selection boundaries, keys, prop merging, refs, markers, validation, server-rendered layouts, and empty results.
+
+### Releasing
+
+1. Update `CHANGELOG.md`. Use a major version for breaking changes, minor for compatible features, and patch for fixes.
+2. Run `npm version patch --no-git-tag-version` (or `minor` / `major`) to update both package files. For the prepared v3 release, keep `3.0.0`.
+3. Run `npm run check` and `npm pack --dry-run`; inspect the files and release notes.
+4. Commit the release, create a matching `vX.Y.Z` tag, and publish with `npm publish` when ready.
+
+The build uses a patched esbuild range through a scoped npm override until tsup updates its dependency. Revisit this override when upgrading tsup.
+
+Publishing is manual. `prepack` builds fresh distributable files before packing or publishing.
 
 ## License
 
-MIT License
+[MIT](./LICENSE)

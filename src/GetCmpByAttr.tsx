@@ -1,270 +1,239 @@
-import React, {
-    ReactElement,
-    ReactNode,
-    cloneElement,
-    isValidElement,
-    useMemo,
-    useCallback,
-    useEffect
+import {
+  Children,
+  Fragment,
+  cloneElement,
+  createElement,
+  isValidElement,
+  type HTMLAttributes,
+  type ReactElement,
+  type ReactNode,
 } from 'react';
 
-/**
- * Configuration options for finding and modifying React components
- * @template P - Props type of the target component
- */
-export interface ComponentFinderProps<P = unknown> {
-    /** React children to search through */
-    children: ReactNode;
-    /** HTML attribute name to search for (default: 'data-slot') */
-    attribute?: string;
-    /** Attribute value to match */
-    value?: string;
-    /** Props to merge into the found component */
-    props?: Partial<P>;
-    /** Enable debug logging */
-    debug?: boolean;
-    /** Find all matching components */
-    findAll?: boolean;
-    /** Callback triggered when component is found */
-    onFound?: (component: ReactElement) => void;
-    /** Merge strategy for function props */
-    functionPropMerge?: 'combine' | 'override';
+type ElementProps = Record<string, unknown>;
+type SelectedElement = ReactElement<ElementProps>;
+const markerKey = Symbol.for('react-cmp-selector.marker');
+type MarkerMetadata = { attribute: string; name: string };
+
+export interface ComponentFinderProps<P = ElementProps> {
+  children: ReactNode;
+  /** Attribute to match. Defaults to data-slot. */
+  attribute?: string;
+  /** Exact value to match. Defaults to an empty string. */
+  value?: string;
+  /** Overrides, with special merging for className, style and functions. */
+  props?: Partial<P>;
+  /** Log search results outside production. Defaults to false. */
+  debug?: boolean;
+  /** Return every match in depth-first order. Defaults to false. */
+  findAll?: boolean;
+  /** Child function first, injected function second. Ref callbacks are never combined. */
+  functionPropMerge?: 'combine' | 'override';
 }
 
-/**
- * Custom React hook for finding components by attribute with enhanced capabilities
- * 
- * @remarks
- * This hook provides advanced component searching with prop merging, debug capabilities,
- * and support for complex React trees. It's ideal for component injection patterns.
- * 
- * @template P - Props type of the target component
- * @param options - Configuration options for the finder
- * @returns Found component(s) or null
- * 
- * @example
- * // Find and modify a header component
- * const header = getCmpByAttr({
- *   value: 'header',
- *   props: { className: 'sticky-header' }
- * });
- * 
- * @example
- * // Find all matching buttons with combined click handlers
- * const buttons = getCmpByAttr({
- *   attribute: 'data-role',
- *   value: 'action-button',
- *   findAll: true,
- *   functionPropMerge: 'combine'
- * });
- */
-export function getCmpByAttr<P = unknown>({
-    children,
-    attribute = 'data-slot',
-    value = '',
-    props = {},
-    debug = false,
-    findAll = false,
-    onFound,
-    functionPropMerge = 'combine'
-}: ComponentFinderProps<P>): ReactNode | ReactNode[] | null {
-    const propsRef = useMemo(() => props, [props]);
-
-    const mergeProps = useCallback((
-        original: Record<string, unknown>,
-        newProps: Record<string, unknown>
-    ) => {
-        const merged = { ...original };
-
-        for (const [key, val] of Object.entries(newProps)) {
-            const existingProp = merged[key];
-
-            if (functionPropMerge === 'combine' &&
-                typeof existingProp === 'function' &&
-                typeof val === 'function') {
-                merged[key] = (...args: unknown[]) => {
-                    existingProp(...args);
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-                    (val as Function)(...args);
-                };
-            } else {
-                merged[key] = val;
-            }
-        }
-
-        return merged;
-    }, [functionPropMerge]);
-
-    const searchChildren = useCallback((nodes: ReactNode): ReactElement[] => {
-        const matches: ReactElement[] = [];
-
-        const walkTree = (node: ReactNode) => {
-            if (!isValidElement(node)) return;
-
-            const element = node as ReactElement;
-            const elementProps = element.props as Record<string, unknown>;
-
-            // Check current element
-            if (elementProps[attribute] === value) {
-                matches.push(element);
-                onFound?.(element);
-            }
-
-            // Recursively search children
-            if (elementProps.children) {
-                React.Children.forEach(elementProps.children as ReactNode, walkTree);
-            }
-        };
-
-        React.Children.forEach(nodes, walkTree);
-
-        return matches;
-    }, [attribute, value, onFound]);
-
-    const foundComponents = useMemo(() => searchChildren(children), [children, searchChildren]);
-
-    useEffect(() => {
-        if (debug && process.env.NODE_ENV !== 'production') {
-            console.groupCollapsed(`[Component Finder] ${attribute}="${value}"`);
-            console.log('Search Parameters:', { attribute, value });
-            console.log('Matches Found:', foundComponents.length);
-            console.log('Components:', foundComponents);
-            console.groupEnd();
-        }
-    }, [debug, foundComponents, attribute, value]);
-
-    return useMemo(() => {
-        if (foundComponents.length === 0) {
-            if (debug && process.env.NODE_ENV !== 'production') {
-                console.warn(
-                    `No components found with ${attribute}="${value}".\nAvailable attributes:`,
-                    React.Children.toArray(children)
-                        .filter(isValidElement)
-                        .flatMap(c => Object.entries((c.props as Record<string, unknown>))
-                            .filter(([k]) => k.startsWith('data-'))
-                            .map(([k, v]) => `${k}: ${v}`)
-                        ),
-                );
-            }
-            return null;
-        }
-
-        const processComponent = (component: ReactElement) => {
-            try {
-                return cloneElement(
-                    component,
-                    mergeProps(
-                        component.props as Record<string, unknown>,
-                        propsRef as Record<string, unknown>
-                    )
-                );
-            } catch (error) {
-                if (process.env.NODE_ENV !== 'production') {
-                    console.error('Component cloning error:', error);
-                }
-                return component;
-            }
-        };
-
-        const result = findAll
-            ? foundComponents.map(processComponent)
-            : processComponent(foundComponents[0]);
-
-        return result;
-    }, [foundComponents, propsRef, debug, findAll, attribute, value, mergeProps]);
+function isProduction(): boolean {
+  try {
+    // Keep this expression intact so browser bundlers can replace it.
+    return process.env.NODE_ENV === 'production';
+  } catch {
+    return false;
+  }
 }
 
-/**
- * Props for the Slot component
- * @template P - Props type of the slotted component
- */
-export interface SlotProps<P = unknown> extends Omit<ComponentFinderProps<P>, 'value' | 'findAll' | 'onFound'> {
-    /** Slot identifier to search for */
-    name: string;
-    /** Fallback content when no slot is found */
-    fallback?: ReactNode;
+function attributeValue(element: SelectedElement, attribute: string): unknown {
+  const type = element.type;
+  if (typeof type === 'function') {
+    const marker = (type as unknown as Record<symbol, MarkerMetadata>)[
+      markerKey
+    ];
+    // Markers have a fixed name, including when conflicting props are supplied.
+    if (marker?.attribute === attribute) return marker.name;
+  }
+  return element.props[attribute];
 }
 
-/**
- * Declarative component version of getCmpByAttr
- * 
- * @remarks
- * Provides a React component interface for the slot finding functionality
- * with additional validation and fallback capabilities.
- * 
- * @example
- * <Slot name="header" fallback={<DefaultHeader />}>
- *   {children}
- * </Slot>
- */
-export function Slot<P = unknown>({
-    children,
-    name,
-    attribute = 'data-slot',
-    props = {},
-    debug = false,
-    fallback = null,
-    functionPropMerge = 'combine'
-}: SlotProps<P>) {
-    const component = getCmpByAttr({
-        children,
-        attribute,
-        value: name,
-        props,
-        debug,
-        functionPropMerge
-    });
-
-    return component || fallback;
-}
-
-/**
- * Utility functions for working with slots
- */
-export const SlotUtils = {
-    /**
-     * Creates a slot marker component for type-safe slot declaration
-     * 
-     * @param name - Slot identifier
-     * @param attribute - Attribute name to use (default: 'data-slot')
-     * @returns Slot marker component
-     * 
-     * @example
-     * const HeaderSlot = SlotUtils.createMarker('header');
-     * <HeaderSlot>...</HeaderSlot>
-     */
-    createMarker: (name: string, attribute: string = 'data-slot') => {
-        return ({ children, ...props }: { children?: ReactNode } & Record<string, unknown>) =>
-            React.createElement(
-                'div',
-                {
-                    ...props,
-                    style: { display: 'contents', ...(typeof props.style === 'object' && props.style !== null ? props.style : {}) },
-                    [attribute]: name
-                },
-                children
-            );
-    },
-
-    /**
-     * Validates required slots in development environment
-     * 
-     * @param children - Component children to validate
-     * @param requiredSlots - Array of required slot names
-     * @param attribute - Attribute name to check (default: 'data-slot')
-     */
-    validate: (children: ReactNode, requiredSlots: string[], attribute = 'data-slot') => {
-        if (process.env.NODE_ENV === 'development') {
-            const presentSlots = React.Children.toArray(children)
-                .filter(isValidElement)
-                .map(child => (child.props as Record<string, unknown>)[attribute])
-                .filter(Boolean);
-
-            requiredSlots.forEach(slot => {
-                if (!presentSlots.includes(slot)) {
-                    console.warn(`Missing required slot: "${slot}"`);
-                }
-            });
-        }
+/** Walk only the supplied element tree; never call user components. */
+function visit(
+  children: ReactNode,
+  callback: (element: SelectedElement, path: string) => boolean,
+  parentPath = '',
+  scopedKeys = false,
+): boolean {
+  let stopped = false;
+  const nodes = scopedKeys ? Children.toArray(children) : children;
+  Children.forEach(nodes, (child, index) => {
+    if (stopped || !isValidElement<ElementProps>(child)) return;
+    const segment = child.key === null ? `i${index}` : `k${String(child.key)}`;
+    // Length prefixes keep keys unambiguous across nested sibling groups.
+    const path = scopedKeys ? `${parentPath}${segment.length}:${segment}` : '';
+    stopped = callback(child, path);
+    if (!stopped && child.props.children != null) {
+      stopped = visit(
+        child.props.children as ReactNode,
+        callback,
+        path,
+        scopedKeys,
+      );
     }
+  });
+  return stopped;
+}
+
+function mergeProps(
+  original: ElementProps,
+  injected: ElementProps,
+  strategy: 'combine' | 'override',
+): ElementProps {
+  const merged: ElementProps = { ...injected };
+  for (const key of Object.keys(injected)) {
+    // React 17/18 reserve key and ref and expose warning getters on props.
+    if (key === 'key' || key === 'ref') continue;
+    const previous = original[key];
+    const next = injected[key];
+    if (
+      key === 'className' &&
+      typeof previous === 'string' &&
+      typeof next === 'string'
+    ) {
+      merged[key] = [previous, next].filter(Boolean).join(' ');
+    } else if (
+      key === 'style' &&
+      previous &&
+      next &&
+      typeof previous === 'object' &&
+      typeof next === 'object'
+    ) {
+      merged[key] = { ...previous, ...next };
+    } else if (
+      strategy === 'combine' &&
+      typeof previous === 'function' &&
+      typeof next === 'function'
+    ) {
+      merged[key] = function (this: unknown, ...args: unknown[]) {
+        previous.apply(this, args);
+        return next.apply(this, args);
+      };
+    }
+  }
+  return merged;
+}
+
+export function getCmpByAttr<P = ElementProps>(
+  options: ComponentFinderProps<P> & { findAll: true },
+): SelectedElement[];
+export function getCmpByAttr<P = ElementProps>(
+  options: ComponentFinderProps<P> & { findAll?: false },
+): SelectedElement | null;
+export function getCmpByAttr<P = ElementProps>(
+  options: ComponentFinderProps<P>,
+): SelectedElement | SelectedElement[] | null;
+/** Select elements by attribute. Safe to call outside React; contains no hooks. */
+export function getCmpByAttr<P = ElementProps>({
+  children,
+  attribute = 'data-slot',
+  value = '',
+  props,
+  debug = false,
+  findAll = false,
+  functionPropMerge = 'combine',
+}: ComponentFinderProps<P>): SelectedElement | SelectedElement[] | null {
+  const matches: SelectedElement[] = [];
+  const injected = props as ElementProps | undefined;
+  const hasOverrides =
+    injected !== undefined && Object.keys(injected).length > 0;
+  visit(
+    children,
+    (element, path) => {
+      if (attributeValue(element, attribute) !== value) return false;
+      const overrides = hasOverrides
+        ? mergeProps(element.props, injected!, functionPropMerge)
+        : {};
+      // Flattening multiple branches requires keys scoped to their original paths.
+      const selected = findAll
+        ? cloneElement(element, { ...overrides, key: path })
+        : hasOverrides
+          ? cloneElement(element, overrides)
+          : element;
+      matches.push(selected);
+      return !findAll;
+    },
+    '',
+    findAll,
+  );
+  if (debug && !isProduction()) {
+    console.debug(
+      `[react-cmp-selector] ${attribute}="${value}": ${matches.length} match(es)`,
+      matches,
+    );
+  }
+  return findAll ? matches : (matches[0] ?? null);
+}
+
+export interface SlotProps<P = ElementProps> extends Omit<
+  ComponentFinderProps<P>,
+  'value'
+> {
+  name: string;
+  fallback?: ReactNode;
+}
+
+/** Render the selected element(s), or a fallback when none match. */
+export function Slot<P = ElementProps>({
+  name,
+  fallback = null,
+  ...options
+}: SlotProps<P>): ReactElement {
+  const result = getCmpByAttr({ ...options, value: name });
+  const content =
+    result === null || (Array.isArray(result) && result.length === 0)
+      ? fallback
+      : result;
+  return createElement(Fragment, null, content);
+}
+
+export type SlotMarkerProps = HTMLAttributes<HTMLDivElement> & {
+  [attribute: `data-${string}`]: unknown;
 };
+
+/** Declare markers at module scope to preserve component identity. */
+function createMarker(name: string, attribute = 'data-slot') {
+  function SlotMarker({
+    children,
+    style,
+    ...props
+  }: SlotMarkerProps): ReactElement {
+    return createElement(
+      'div',
+      {
+        ...props,
+        style: { display: 'contents', ...style },
+        [attribute]: name,
+      },
+      children,
+    );
+  }
+  SlotMarker.displayName = `SlotMarker(${name})`;
+  Object.defineProperty(SlotMarker, markerKey, { value: { name, attribute } });
+  return SlotMarker;
+}
+
+/** Return missing names in all environments; also warn outside production. */
+function validate(
+  children: ReactNode,
+  requiredSlots: readonly string[],
+  attribute = 'data-slot',
+): string[] {
+  const present = new Set<unknown>();
+  visit(children, (element) => {
+    present.add(attributeValue(element, attribute));
+    return false;
+  });
+  const missing = [...new Set(requiredSlots)].filter(
+    (name) => !present.has(name),
+  );
+  if (!isProduction()) {
+    missing.forEach((name) => console.warn(`Missing required slot: "${name}"`));
+  }
+  return missing;
+}
+
+export const SlotUtils = { createMarker, validate };

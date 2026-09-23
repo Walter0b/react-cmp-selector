@@ -1,7 +1,5 @@
 /node_modules
 /dist
-.npmignore
+/coverage
+*.tgz
 .DS_Store
-tree.py
-bun.lockb
-next-navlink-1.2.0.tgz
