@@ -16,17 +16,11 @@ type MarkerMetadata = { attribute: string; name: string };
 
 export interface ComponentFinderProps<P = ElementProps> {
   children: ReactNode;
-  /** Attribute to match. Defaults to data-slot. */
   attribute?: string;
-  /** Exact value to match. Defaults to an empty string. */
   value?: string;
-  /** Overrides, with special merging for className, style and functions. */
   props?: Partial<P>;
-  /** Log search results outside production. Defaults to false. */
   debug?: boolean;
-  /** Return every match in depth-first order. Defaults to false. */
   findAll?: boolean;
-  /** Child function first, injected function second. Ref callbacks are never combined. */
   functionPropMerge?: 'combine' | 'override';
 }
 
@@ -45,13 +39,11 @@ function attributeValue(element: SelectedElement, attribute: string): unknown {
     const marker = (type as unknown as Record<symbol, MarkerMetadata>)[
       markerKey
     ];
-    // Markers have a fixed name, including when conflicting props are supplied.
     if (marker?.attribute === attribute) return marker.name;
   }
   return element.props[attribute];
 }
 
-/** Walk only the supplied element tree; never call user components. */
 function visit(
   children: ReactNode,
   callback: (element: SelectedElement, path: string) => boolean,
@@ -126,7 +118,6 @@ export function getCmpByAttr<P = ElementProps>(
 export function getCmpByAttr<P = ElementProps>(
   options: ComponentFinderProps<P>,
 ): SelectedElement | SelectedElement[] | null;
-/** Select elements by attribute. Safe to call outside React; contains no hooks. */
 export function getCmpByAttr<P = ElementProps>({
   children,
   attribute = 'data-slot',
@@ -147,7 +138,6 @@ export function getCmpByAttr<P = ElementProps>({
       const overrides = hasOverrides
         ? mergeProps(element.props, injected!, functionPropMerge)
         : {};
-      // Flattening multiple branches requires keys scoped to their original paths.
       const selected = findAll
         ? cloneElement(element, { ...overrides, key: path })
         : hasOverrides
@@ -176,7 +166,6 @@ export interface SlotProps<P = ElementProps> extends Omit<
   fallback?: ReactNode;
 }
 
-/** Render the selected element(s), or a fallback when none match. */
 export function Slot<P = ElementProps>({
   name,
   fallback = null,
@@ -194,7 +183,6 @@ export type SlotMarkerProps = HTMLAttributes<HTMLDivElement> & {
   [attribute: `data-${string}`]: unknown;
 };
 
-/** Declare markers at module scope to preserve component identity. */
 function createMarker(name: string, attribute = 'data-slot') {
   function SlotMarker({
     children,
@@ -216,7 +204,6 @@ function createMarker(name: string, attribute = 'data-slot') {
   return SlotMarker;
 }
 
-/** Return missing names in all environments; also warn outside production. */
 function validate(
   children: ReactNode,
   requiredSlots: readonly string[],

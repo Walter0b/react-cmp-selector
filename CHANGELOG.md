@@ -1,6 +1,10 @@
 # Changelog
 
-## 3.0.0 — Unreleased
+## 3.0.1 — 2026-09-26
+
+- Remove maintainer release notes from the README and drop leftover restating comments.
+
+## 3.0.0 — 2026-09-23
 
 ### Breaking changes
 
@@ -27,8 +31,7 @@
 - React 19 support alongside React 17 and 18; remove the unused React DOM peer dependency.
 - Support `findAll` on `Slot`, including fallback rendering for empty results.
 - Return missing slot names from validation in all environments.
-- Add return-type overloads, typed div markers, behavior tests, SSR tests, package checks, and a React/Node compatibility CI matrix.
-- Add a dependency lockfile and documented release workflow.
+- Add return-type overloads and typed div markers.
 
 ## 2.0.0 — 2025-04-11
 

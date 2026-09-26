@@ -1,6 +1,6 @@
 {
   "name": "react-cmp-selector",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "Named slots and attribute-based selection for React element trees.",
   "type": "module",
   "main": "./dist/index.cjs",

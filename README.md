@@ -215,30 +215,6 @@ Version 3 is a major release with these intentional changes:
 6. React 19 is supported. `react-dom` is no longer a peer dependency. The package provides separate ESM and CommonJS files and targets ES2020; older browsers need application-level transpilation.
 7. README examples now pass visible elements. Examples that expected selection inside `<ChildComponents />` never worked; expose the selection attribute on that component or pass its slotted elements explicitly.
 
-## Development
-
-Use Node.js 22.12+ or 24 and npm.
-
-```sh
-npm ci
-npm run check
-```
-
-`check` runs formatting verification, TypeScript checks, behavioral tests, both builds, and package export/content checks (including ESM and CommonJS TypeScript consumers). `npm run test:watch` starts watch mode; `npm run format` formats the repository.
-
-CI runs the same checks against React and React DOM 17, 18 and 19, with matching React types, on Node.js 22 and 24. Tests cover selection boundaries, keys, prop merging, refs, markers, validation, server-rendered layouts, and empty results.
-
-### Releasing
-
-1. Update `CHANGELOG.md`. Use a major version for breaking changes, minor for compatible features, and patch for fixes.
-2. Run `npm version patch --no-git-tag-version` (or `minor` / `major`) to update both package files. For the prepared v3 release, keep `3.0.0`.
-3. Run `npm run check` and `npm pack --dry-run`; inspect the files and release notes.
-4. Commit the release, create a matching `vX.Y.Z` tag, and publish with `npm publish` when ready.
-
-The build uses a patched esbuild range through a scoped npm override until tsup updates its dependency. Revisit this override when upgrading tsup.
-
-Publishing is manual. `prepack` builds fresh distributable files before packing or publishing.
-
 ## License
 
 [MIT](./LICENSE)
